@@ -11,17 +11,17 @@ train:
 data:
   timestamp_path: 'vctk-silence-labels/vctk-silences.0.92.txt'
   base_dir: '/DATA1/VCTK-0.92/wav48_silence_trimmed/'
-  dir: '/DATA1/VCTK-0.92/wav48_silence_trimmed_wav/'
-  format: '*mic1.wav'
+  dir: '/DATA1/VCTK-0.92/wav48_silence_trimmed_wav/' #数据集路径
+  format: '*mic1.wav' # 文件格式
   cv_ratio: (100./108., 8./108., 0.00) #train/val/test
 
 audio:
   filter_length: 1024
-  hop_length: 256
+  hop_length: 256 # test时数据帧长度（因数）
   win_length: 1024
-  sampling_rate: 48000
-  sr_min: 6000
-  sr_max: 48000
+  sampling_rate: 48000 #数据集采样率
+  sr_min: 6000 #
+  sr_max: 48000 #
   length: 32768 #32*1024 ~ 1sec
 
 arch:

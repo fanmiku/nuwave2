@@ -25,7 +25,8 @@ def create_vctk_dataloader(hparams, cv, sr=24000):
         band_list = torch.stack(band_list, dim=0)
 
         return wav_list, wav_l_list, band_list
-
+    
+    # 区别在于pin_memory （内存交换）
     if cv == 0:
         return DataLoader(dataset=VCTKMultiSpkDataset(hparams, cv),
                           batch_size=hparams.train.batch_size,
@@ -48,6 +49,7 @@ def create_vctk_dataloader(hparams, cv, sr=24000):
 
 class VCTKMultiSpkDataset(Dataset):
     def __init__(self, hparams, cv=0, sr=24000):  # cv 0: train, 1: val, 2: test
+        # 获取音频文件list
         def _get_datalist(folder, file_format, spk_list, cv):
             _dl = []
             len_spk_list = len(spk_list)
@@ -60,17 +62,18 @@ class VCTKMultiSpkDataset(Dataset):
                     if not (int(len_spk_list * self.cv_ratio[0]) <= i and
                             i <= int(len_spk_list * (self.cv_ratio[0] + self.cv_ratio[1]))):
                         continue
+                # 以下重复了
                 else:
                     if not (int(len_spk_list * self.cv_ratio[0]) <= i and
                             i <= int(len_spk_list * (self.cv_ratio[0] + self.cv_ratio[1]))):
-                        continue
+                        continue  
                 _full_spk_dl = sorted(glob(path.join(spk, file_format)))
                 _len = len(_full_spk_dl)
                 if (_len == 0): continue
                 s += 1
                 _dl.extend(_full_spk_dl)
 
-            print(cv, s)
+            print(cv, s)# 输出cv（数据集类型）和speaker数量
             return _dl
 
         def _get_spk(folder):
@@ -80,7 +83,7 @@ class VCTKMultiSpkDataset(Dataset):
         self.cv = cv
         self.cv_ratio = eval(hparams.data.cv_ratio)
         self.sr = sr
-        self.directory = hparams.data.dir
+        self.directory = hparams.data.dir 
         self.dataformat = hparams.data.format
 
         self.data_list = _get_datalist(self.directory, self.dataformat,
@@ -92,9 +95,11 @@ class VCTKMultiSpkDataset(Dataset):
         return len(self.data_list)
 
     def __getitem__(self, index):
+        # 读取音频文件并平均归一化
         wav, _ = rosa.load(self.data_list[index], self.hparams.audio.sampling_rate)
         wav /= np.max(np.abs(wav))
-
+        
+        # 填充或截断
         if wav.shape[0] < self.hparams.audio.length:
             padl = self.hparams.audio.length - wav.shape[0]
             r = random.randint(0, padl) if self.cv < 2 else padl // 2
@@ -102,9 +107,11 @@ class VCTKMultiSpkDataset(Dataset):
         else:
             start = random.randint(0, wav.shape[0] - self.hparams.audio.length)
             wav = wav[start:start + self.hparams.audio.length] if self.cv < 2 \
-                else wav[:len(wav) - len(wav) % self.hparams.audio.hop_length]
+                else wav[:len(wav) - len(wav) % self.hparams.audio.hop_length] #cv=2时，截断到hop_length的整数倍
+        # 缩放
         wav *= random.random() / 2 + 0.5 if self.cv < 2 else 1
 
+        # 滤波
         if self.cv == 0:
             order = random.randint(1, 11)
             ripple = random.choice([1e-9, 1e-6, 1e-3, 1, 5])
@@ -118,7 +125,7 @@ class VCTKMultiSpkDataset(Dataset):
                 highcut = self.sr // 2
 
         nyq = 0.5 * self.hparams.audio.sampling_rate
-        hi = highcut / nyq
+        hi = highcut / nyq # 归一化截止频率
 
         if hi == 1:
             wav_l = wav
@@ -130,12 +137,14 @@ class VCTKMultiSpkDataset(Dataset):
             wav_l = resample_poly(wav_l, highcut * 2, self.hparams.audio.sampling_rate)
             # upsample to the original sampling rate
             wav_l = resample_poly(wav_l, self.hparams.audio.sampling_rate, highcut * 2)
-
+        
+        #填充或截断
         if len(wav_l) < len(wav):
             wav_l = np.pad(wav, (0, len(wav) - len(wav_l)), 'constant', constant_values=0)
         elif len(wav_l) > len(wav):
             wav_l = wav_l[:len(wav)]
-
+        
+        #创建一个band？
         fft_size = self.hparams.audio.filter_length // 2 + 1
         band = torch.zeros(fft_size, dtype = torch.int64)
         band[:int(hi * fft_size)] = 1

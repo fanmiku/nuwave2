@@ -9,7 +9,7 @@ from diffusion import Diffusion
 class NuWave2(pl.LightningModule):
     def __init__(self, hparams, train=True):
         super().__init__()
-        self.save_hyperparameters(hparams)
+        self.save_hyperparameters(hparams) # 保存超参数
 
         self.model = Diffusion(hparams)
 
